@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🧡 Hoy Sí — Sin excusas ni peros</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>🧡 Hoy Sí — Sin excusas ni peros</h1>
+  <p>Límite de cupones usados: <span id="usedCount">0</span>/100</p>
+  <button id="useCoupon">✨ Usar cupón</button>
+
+  <form id="useForm" style="display:none;">
+    <label>¿En qué lo usamos?</label>
+    <input type="text" id="uso" placeholder="Cena, paseo, etc.">
+    <label>Puntuación</label>
+    <select id="stars">
+      <option value="1">⭐</option>
+      <option value="2">⭐⭐</option>
+      <option value="3">⭐⭐⭐</option>
+      <option value="4">⭐⭐⭐⭐</option>
+      <option value="5">⭐⭐⭐⭐⭐</option>
+    </select>
+    <label>Comentario</label>
+    <textarea id="comment" placeholder="Qué tanto te gustó..."></textarea>
+    <button type="submit">Guardar</button>
+  </form>
+
+  <h2>Historial</h2>
+  <ul id="history"></ul>
+
+  <script src="script.js"></script>
+<style>
+body {
+  font-family: 'Poppins', sans-serif;
+  background: #fff4ec;
+  color: #4a2c10;
+  text-align: center;
+  padding: 2rem;
+}
+
+button {
+  background: #ffb07c;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 15px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+button:hover {
+  background: #e2905f;
+}
+
+input, textarea, select {
+  display: block;
+  margin: 10px auto;
+  width: 80%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+}
+
+#history {
+  list-style: none;
+  padding: 0;
+}
+#history li {
+  background: #ffd6b5;
+  border-radius: 12px;
+  margin: 8px 0;
+  padding: 8px;
+}
+
+</style>
+
+<script>
+  const GITHUB_USERNAME = "TU_USUARIO";
+const REPO_NAME = "TU_REPOSITORIO";
+const FILE_PATH = "hoy-si/data.json";
+const TOKEN = "TU_TOKEN_PERSONAL";
+
+const btn = document.getElementById("useCoupon");
+const form = document.getElementById("useForm");
+const historyList = document.getElementById("history");
+const usedCountEl = document.getElementById("usedCount");
+
+const CUPON_LIMIT = 100;
+
+// Guardar historial permanentemente
+let storedData = JSON.parse(localStorage.getItem("historial")) || [];
+
+// Mostrar historial al cargar
+displayData(storedData);
+updateUsedCount();
+
+btn.addEventListener("click", () => {
+  if (storedData.length >= CUPON_LIMIT) {
+    alert("Se alcanzó el límite de 100 cupones 😅");
+    return;
+  }
+  btn.style.background = "#ccc";
+  form.style.display = "block";
+});
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const uso = document.getElementById("uso").value;
+  const stars = document.getElementById("stars").value;
+  const comment = document.getElementById("comment").value;
+
+  const entry = { fecha: new Date().toLocaleString(), uso, stars, comment };
+
+  // Guardar en localStorage
+  storedData.push(entry);
+  localStorage.setItem("historial", JSON.stringify(storedData));
+  displayData(storedData);
+  updateUsedCount();
+
+  form.reset();
+
+  // Guardar en GitHub
+  const current = await getData();
+  current.push(entry);
+  await saveData(current);
+});
+
+function displayData(data) {
+  historyList.innerHTML = "";
+  data.forEach(e => {
+    const li = document.createElement("li");
+    li.textContent = `${e.fecha} — ${e.uso} (${e.stars}⭐) - ${e.comment}`;
+    historyList.appendChild(li);
+  });
+}
+
+function updateUsedCount() {
+  usedCountEl.textContent = storedData.length;
+}
+
+// GitHub API
+async function getData() {
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${FILE_PATH}`, {
+    headers: { Authorization: `token ${TOKEN}` }
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  const content = atob(json.content);
+  return JSON.parse(content);
+}
+
+async function saveData(data) {
+  const content = btoa(JSON.stringify(data, null, 2));
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${FILE_PATH}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `token ${TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message: "Update hoy-si data",
+      content: content,
+      sha: await getSha(),
+    }),
+  });
+}
+
+async function getSha() {
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${FILE_PATH}`, {
+    headers: { Authorization: `token ${TOKEN}` },
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.sha;
+}
+</script>
+</body>
+</html>
